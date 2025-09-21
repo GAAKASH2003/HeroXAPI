@@ -148,18 +148,22 @@ async def track_user(unique_id: str, request: Request):
         "credentials_captured": True
     }
     if campaign_result.form_submitted_at is None:
-        updates["form_submitted_at"] = datetime.utcnow()
+        updates["form_submitted_at"] = datetime.utcnow().isoformat()  
 
-    new_data = json.dumps(body)
+    try:
+        new_data = json.dumps(body)
+    except TypeError:
+        new_data = str(body)  # fallback to string if body contains non-serializable data
+
     if campaign_result.captured_data:
-        updates["captured_data"] = campaign_result.captured_data + "\n" + new_data
+        updates["captured_data"] = str(campaign_result.captured_data) + "\n" + new_data
     else:
         updates["captured_data"] = new_data
 
     # Update DB
     campaign_result.update_record(**updates)
     db.commit()
-
+    json_safe_updates = {k: (v.isoformat() if isinstance(v, datetime) else v) for k, v in updates.items()}
     return JSONResponse(
         status_code=status.HTTP_200_OK,
         content={
@@ -167,7 +171,7 @@ async def track_user(unique_id: str, request: Request):
             "detail": "Form data captured successfully",
             "campaign_id": campaign_id,
             "user_id": user_id,
-            "updates": updates
+            "updates": json_safe_updates
         }
     )
 
