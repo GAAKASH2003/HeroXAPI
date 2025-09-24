@@ -23,7 +23,6 @@ router = APIRouter()
 class UserCreate(BaseModel):
     username: str
     email: EmailStr
-    is_admin: bool
     password: str
     full_name: Optional[str] = None
 
@@ -34,7 +33,8 @@ class UserLogin(BaseModel):
 class UserResponse(BaseModel):
     id: int
     username: str
-    is_admin:bool
+    role:Optional[bool] = False
+    # is_admin:Optional[bool] = False
     email: str
     full_name: Optional[str] = None
     created_at: datetime
@@ -78,7 +78,7 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID") #"your-google-client-id"
 GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET") #"your-google-client-secret"
-REDIRECT_URI = f"{os.getenv('BACKEND_URL')}/api/v1/auth/google/callback"
+REDIRECT_URI = f"http://localhost:8000/api/v1/auth/google/callback"
 
 
 config = Config(environ={
@@ -171,7 +171,7 @@ async def auth_google_callback(request: Request):
             )
 
         # Step 5: Redirect to frontend
-        frontend_url = f"{os.getenv('FRONTEND_URL')}/oauth/callback?token={access_token}"
+        frontend_url = f"http://localhost:3000/oauth/callback?token={access_token}"
         return RedirectResponse(url=frontend_url)
 
     except HTTPException:
@@ -198,16 +198,15 @@ async def signup(user_data: UserCreate):
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="User with this email or username already exists"
         )
-    
     # Hash password
     hashed_password = hash_password(user_data.password)
-    
+    print("Hashed password:", hashed_password)
     # Create user
     user_id = db.users.insert(
         username=user_data.username,
         email=user_data.email,
         password=hashed_password,
-        is_admin=user_data.is_admin,
+        is_admin=False,
         full_name=user_data.full_name
     )
     db.commit()
@@ -218,7 +217,7 @@ async def signup(user_data: UserCreate):
     # Create access token
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
-        data={"sub": user.email, "user_id": user.id}, 
+        data={"sub": user.email, "user_id": user.id,"role":user.is_admin}, 
         expires_delta=access_token_expires
     )
     
@@ -226,7 +225,7 @@ async def signup(user_data: UserCreate):
         user=UserResponse(
             id=user.id,
             username=user.username,
-            is_admin=user.is_admin,
+            # is_admin=user.is_admin,
             email=user.email,
             full_name=user.full_name,
             created_at=user.created_at
@@ -261,7 +260,7 @@ async def login(user_credentials: UserLogin, request: Request):
     # Create access token
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
-        data={"sub": user.email, "user_id": user.id}, 
+        data={"sub": user.email, "user_id": user.id,"role":user.is_admin}, 
         expires_delta=access_token_expires
     )
     
@@ -282,8 +281,9 @@ async def get_current_user_info(current_user = Depends(get_current_user)):
     return UserResponse(
         id=current_user.id,
         username=current_user.username,
-        is_admin=current_user.is_admin,
         email=current_user.email,
+        role = current_user.is_admin,
+        # is_admin=current_user.is_admin
         full_name=current_user.full_name,
         created_at=current_user.created_at,
         ai_model=current_user.ai_model,

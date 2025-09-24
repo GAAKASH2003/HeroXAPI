@@ -42,6 +42,24 @@ class UserSettingsResponse(BaseModel):
     class Config:
         from_attributes = True
 
+class UserResponse(BaseModel):
+    id: int
+    username: str
+    # is_admin:Optional[bool] = False
+    email: str
+    full_name: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
+    ai_model:Optional[str] = None
+    ai_provider:Optional[str] = None
+    ai_max_tokens:Optional[int] = None
+    ai_temperature:Optional[float] = None
+    ai_is_active:Optional[bool] = None
+
+
+    class Config:
+        from_attributes = True
+
 def hash_password(password: str) -> str:
     return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
 
@@ -208,7 +226,7 @@ async def update_ai_settings(
     # Get the updated user
     updated_user = db.users(current_user.id)
     
-    return UserSettingsResponse(
+    return UserResponse(
         id=updated_user.id,
         username=updated_user.username,
         email=updated_user.email,
