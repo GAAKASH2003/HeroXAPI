@@ -365,8 +365,8 @@ async def list_phishlets(current_user = Depends(get_current_user)):
         query|= (db.phishlets.user_id.belongs(admin_ids))
         phishlets = db(query).select()
     else:
-        phishlets = db(query).select()
-    
+        phishlets = db(db.phishlets).select()
+    # print(phishlets)
     return [
         PhishletResponse(
             id=phishlet.id,
