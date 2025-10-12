@@ -184,9 +184,9 @@ async def auth_google_callback(request: Request):
         )
 
 @router.post("/signup", response_model=SignupResponse, status_code=status.HTTP_201_CREATED)
-async def signup(user_data: UserCreate):
+async def signup(user_data: UserCreate, request: Request):
     """Create a new user account"""
-    
+    origin = request.headers.get("origin")
     # Check if user already exists
     existing_user = db(
         (db.users.email == user_data.email) | 
@@ -198,17 +198,27 @@ async def signup(user_data: UserCreate):
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="User with this email or username already exists"
         )
-    # Hash password
+    
     hashed_password = hash_password(user_data.password)
     print("Hashed password:", hashed_password)
     # Create user
-    user_id = db.users.insert(
-        username=user_data.username,
-        email=user_data.email,
-        password=hashed_password,
-        is_admin=False,
-        full_name=user_data.full_name
-    )
+    if("3001" in origin):
+        user_id = db.users.insert(
+            username=user_data.username,
+            email=user_data.email,
+            password=hashed_password,
+            is_admin=True,
+            full_name=user_data.full_name
+        )
+    else:
+        user_id = db.users.insert(
+            username=user_data.username,
+            email=user_data.email,
+            password=hashed_password,
+            is_admin=False,
+            full_name=user_data.full_name
+        )
+    
     db.commit()
     
     # Get the created user
@@ -238,14 +248,16 @@ async def signup(user_data: UserCreate):
 @router.post("/login", response_model=LoginResponse)
 async def login(user_credentials: UserLogin, request: Request):
     """Login user and return access token"""
-    
+    origin = request.headers.get("origin")
     # Find user by email
     user = db(db.users.email == user_credentials.email).select().first()
+    
     if not user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="User not found"
         )
+    
     if(user.password is None):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -256,7 +268,12 @@ async def login(user_credentials: UserLogin, request: Request):
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect email or password"
         )
-    
+    if("3001" in origin and not user.is_admin):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin access required"
+        )
+
     # Create access token
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
