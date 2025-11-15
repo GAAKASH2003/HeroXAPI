@@ -1,10 +1,11 @@
-from fastapi import APIRouter, HTTPException, status, Depends, Request
+from fastapi import APIRouter, HTTPException, status, Depends, Request,UploadFile, File
 from pydantic import BaseModel, EmailStr
-from typing import Optional, List, Union
+from typing import Dict, Optional, List, Union
 from datetime import datetime
 from database import db
 from auth import get_current_user
 from utils.activity_logger import ActivityLogger
+import io, csv
 
 router = APIRouter()
 
@@ -40,6 +41,11 @@ class TargetResponse(BaseModel):
 
     class Config:
         from_attributes = True
+        
+class BulkImportResult(BaseModel):
+    inserted_count: int
+    skipped_duplicates: int
+    errors: List[Dict[str, str]]
 
 def checkIfAdmin(user_id: int) -> bool:
     """Check if a user is admin"""
@@ -174,6 +180,109 @@ async def list_targets(
         )
         for target in targets
     ]
+    
+
+
+
+
+
+
+
+@router.post("/import", response_model=BulkImportResult, status_code=status.HTTP_201_CREATED)
+async def import_targets_csv(
+    file: UploadFile = File(...),
+    current_user = Depends(get_current_user),
+    request: Request = None
+):
+    """
+    Import targets from CSV. Expected headers: first_name,last_name,email,position,group_name,is_active
+    """
+    if not file.filename.lower().endswith((".csv")):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Only CSV files are accepted")
+
+    content = await file.read()
+    try:
+        text = content.decode("utf-8-sig")
+    except Exception:
+        text = content.decode("latin-1")
+
+    reader = csv.DictReader(io.StringIO(text))
+    inserted = 0
+    skipped = 0
+    errors: List[Dict[str, str]] = []
+
+    # cache group name -> id to avoid repeated DB queries
+    group_cache: Dict[str, int] = {}
+
+    for idx, row in enumerate(reader, start=1):
+        try:
+            email = (row.get("email") or "").strip()
+            first_name = (row.get("first_name") or row.get("first name") or "").strip()
+            
+            if not email or not first_name:
+                    raise HTTPException(
+                        status_code=status.HTTP_404_NOT_FOUND,
+                        detail="Upload valid csv file"
+                    )
+                
+          
+            # skip duplicate for this user
+            existing = db((db.targets.user_id == current_user.id) & (db.targets.email == email)).select().first()
+            if existing:
+                skipped += 1
+                continue
+
+            first_name = (row.get("first_name") or "").strip() or None
+            last_name = (row.get("last_name") or "").strip() or None
+            position = (row.get("position") or "").strip() or None
+            is_active_val = (row.get("is_active") or "").strip().lower()
+            is_active = True if is_active_val in ("1","true","yes","y") else False if is_active_val in ("0","false","no","n") else True
+
+            group_id = None
+            group_name = (row.get("group_name") or "").strip()
+            if group_name:
+                if group_name in group_cache:
+                    group_id = group_cache[group_name]
+                else:
+                    group_rec = db((db.groups.user_id == current_user.id) & (db.groups.name == group_name)).select().first()
+                    if not group_rec:
+                        group_id = db.groups.insert(name=group_name, user_id=current_user.id, is_active=True)
+                        db.commit()
+                        group_cache[group_name] = group_id
+                    else:
+                        group_id = group_rec.id
+                        group_cache[group_name] = group_id
+
+            # insert target
+            new_id = db.targets.insert(
+                first_name=first_name,
+                last_name=last_name,
+                email=email,
+                position=position,
+                group_id=group_id,
+                user_id=current_user.id,
+                is_active=is_active,
+            )
+            db.commit()
+
+            # log activity per inserted target
+            if request:
+                client_ip = request.client.host if request.client else None
+                user_agent = request.headers.get("user-agent")
+                ActivityLogger.log_target_added(current_user.id, new_id, email, client_ip, user_agent)
+
+            inserted += 1
+
+        except Exception as e:
+            raise HTTPException(
+                        status_code=status.HTTP_404_NOT_FOUND,
+                        detail="Upload valid csv file"
+                    )
+            # errors.append({"row": str(idx), "error": str(e)})
+            # continue on error for other rows
+
+    return BulkImportResult(inserted_count=inserted, skipped_duplicates=skipped, errors=errors)
+# ...existing code...
 
 @router.get("/{target_id}", response_model=TargetResponse)
 async def get_target(

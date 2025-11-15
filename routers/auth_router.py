@@ -76,8 +76,8 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
     return bcrypt.checkpw(plain_password.encode('utf-8'), hashed_password.encode('utf-8'))
 
 
-GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID") #"your-google-client-id"
-GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET") #"your-google-client-secret"
+GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID") 
+GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET") 
 REDIRECT_URI = f"http://localhost:8000/api/v1/auth/google/callback"
 
 

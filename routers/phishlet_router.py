@@ -214,9 +214,9 @@ async def create_phishlet(
         form_fields = extract_form_fields(phishlet_data.html_content, str(phishlet_data.original_url))
     
     # Create the phishlet first
-    random_uuid = str(uuid4())
+    url_id=new_phishlet.url_id,
     phishlet_id = db.phishlets.insert(
-        url_id=random_uuid,
+        url_id=url_id,
         name=phishlet_data.name,
         description=phishlet_data.description,
         user_id=current_user.id,
@@ -234,7 +234,7 @@ async def create_phishlet(
     db.commit()
     
     # Generate clone URL with the actual phishlet ID
-    clone_url = f"{os.getenv('BACKEND_URL')}/api/v1/phishlets/serve/{random_uuid}"
+    clone_url = f"{os.getenv('BACKEND_URL')}/api/v1/phishlets/serve/{url_id}"
     
     # Update the phishlet with the correct clone URL
     db(db.phishlets.id == phishlet_id).update(clone_url=clone_url)
@@ -299,8 +299,10 @@ async def clone_website_to_phishlet(
     form_fields = extract_form_fields(cloned_content['html'], original_url)
     
     # Create the phishlet first
+    random_uuid = str(uuid4())
     phishlet_id = db.phishlets.insert(
         name=clone_data.name,
+        url_id=random_uuid,
         description=clone_data.description,
         user_id=current_user.id,
         original_url=original_url,
@@ -317,7 +319,8 @@ async def clone_website_to_phishlet(
     db.commit()
     
     # Generate clone URL with the actual phishlet ID
-    clone_url = f"{os.getenv('BACKEND_URL', 'http://localhost:8000')}/api/v1/phishlets/serve/{phishlet_id}"
+   
+    clone_url = f"{os.getenv('BACKEND_URL', 'http://localhost:8000')}/api/v1/phishlets/serve/{random_uuid}"
     
     # Update the phishlet with the correct clone URL
     db(db.phishlets.id == phishlet_id).update(clone_url=clone_url)
