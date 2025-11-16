@@ -164,8 +164,8 @@ async def create_campaign(
 
     new_campaign = db.campaigns(campaign_id)
     # print("cron_expression", f"{m} {h} {d} {mon} {week}")
-    # BACKEND_URL = os.getenv("BACKEND_URL", "http://localhost:8000")
-    BACKEND_URL = "https://m7zfbszf-8000.inc1.devtunnels.ms"
+    BACKEND_URL = os.getenv("BACKEND_URL", "http://localhost:8000")
+    # BACKEND_URL = "https://m7zfbszf-8000.inc1.devtunnels.ms"
     url= BACKEND_URL + "/api/v1/campaigns/send_email",
     cronexpression=f"{m} {h} {d} {mon} *"
     payload = {
