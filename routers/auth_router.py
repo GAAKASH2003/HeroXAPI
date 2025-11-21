@@ -78,7 +78,7 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID") 
 GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET") 
-REDIRECT_URI = f"http://localhost:8000/api/v1/auth/google/callback"
+REDIRECT_URI = f"{os.getenv('BACKEND_URL')}/api/v1/auth/google/callback"
 
 
 config = Config(environ={
@@ -171,7 +171,7 @@ async def auth_google_callback(request: Request):
             )
 
         # Step 5: Redirect to frontend
-        frontend_url = f"http://localhost:3000/oauth/callback?token={access_token}"
+        frontend_url = f"{os.getenv('FRONTEND_URL')}/oauth/callback?token={access_token}"
         return RedirectResponse(url=frontend_url)
 
     except HTTPException:
