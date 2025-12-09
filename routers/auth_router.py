@@ -180,7 +180,7 @@ async def auth_google_callback(request: Request):
         # logger.error(f"Unexpected error in Google OAuth callback: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Unexpected server error during Google login"
+            detail=f"Unexpected server error during Google login,{e}"
         )
 
 @router.post("/signup", response_model=SignupResponse, status_code=status.HTTP_201_CREATED)
