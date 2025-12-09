@@ -91,7 +91,7 @@ oauth.register(
     client_id=GOOGLE_CLIENT_ID,
     client_secret=GOOGLE_CLIENT_SECRET,
     server_metadata_url="https://accounts.google.com/.well-known/openid-configuration",
-    client_kwargs={"scope": "openid email"},
+    client_kwargs={"scope": "openid email profile"},
 )
 
 @router.get("/auth/google")
