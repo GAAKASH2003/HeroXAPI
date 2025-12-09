@@ -100,7 +100,14 @@ app = FastAPI(
 )
 
 # CORS middleware
-app.add_middleware(SessionMiddleware, secret_key="super-secret-session-key")
+app.add_middleware(
+    SessionMiddleware, 
+    secret_key="super-secret-session-key",
+    session_cookie="my_session",  # Give it a unique name
+    max_age=3600,                 # Session lifespan (optional)
+    same_site="None",             # CRITICAL: Allows cross-site requests
+    secure=True                   # CRITICAL: Must be True if same_site="None"
+)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],  # Configure appropriately for production
