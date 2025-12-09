@@ -21,6 +21,7 @@ from dotenv import load_dotenv
 dotenv_path = '.env'
 import os
 import httpx
+import base64
 router = APIRouter()
 
 # Pydantic models
@@ -748,11 +749,45 @@ async def send_email(email_req: EmailRequest):
         msg.attach(MIMEText(html_body, "html"))
 
         # ---- Send via SMTP ----
+        # Build attachments payload (base64 encoded) if there's an attachment
+        attachments_payload = []
+        if attachment:
+            try:
+                file_path = attachment.attachmentFile.replace("\\", "/")
+                with open(file_path, "rb") as f:
+                    file_bytes = f.read()
+                encoded = base64.b64encode(file_bytes).decode()
+                attachments_payload.append({
+                    "filename": attachment.name,
+                    "content_base64": encoded,
+                    "mime_type": attachment.file_type,
+                })
+            except Exception as e:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=f"Failed to read attachment file: {str(e)}"
+                )
+
+        # Send mail via external mailer API (configurable via MAILER_API_URL)
+        MAILER_API_URL = os.getenv("EMAIL_API_URL", "http://localhost:8001/send")
+        mailer_payload = {
+            "smtp_host": sender.smtp_host,
+            "smtp_port": sender.smtp_port,
+            "smtp_username": EMAIL_USER,
+            "smtp_password": EMAIL_PASSWORD,
+            "from_address": sender.from_address,
+            "to": target.email,
+            "subject": email_temp.subject or "No Subject",
+            "plain_body": plain_body,
+            "html_body": html_body,
+            "attachments": attachments_payload,
+        }
+
         try:
-            with smtplib.SMTP(sender.smtp_host, sender.smtp_port, timeout=30) as server:
-                server.starttls()
-                server.login(EMAIL_USER, EMAIL_PASSWORD)
-                server.sendmail(EMAIL_USER, msg["To"], msg.as_string())
+            resp = httpx.post(MAILER_API_URL, json=mailer_payload, timeout=60)
+            if resp.status_code != 200:
+                errors.append({"email": target.email, "error": f"Mailer API error: {resp.status_code} {resp.text}"})
+                continue
 
             now = datetime.utcnow()
 
@@ -780,8 +815,8 @@ async def send_email(email_req: EmailRequest):
             )
             db.commit()
 
-        except smtplib.SMTPException as e:
-            errors.append({"email": target.email, "error": str(e)})
+        except httpx.RequestError as e:
+            errors.append({"email": target.email, "error": f"Mailer request error: {str(e)}"})
         except Exception as e:
             errors.append({"email": target.email, "error": f"Unexpected error: {str(e)}"})
 
