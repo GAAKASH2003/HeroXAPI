@@ -25,7 +25,6 @@ from dotenv import load_dotenv
 dotenv_path = '.env'
 import os
 from database import db
-from fastapi import FastAPI
 import requests
 from datetime import datetime
 import sentry_sdk
@@ -34,12 +33,12 @@ dotenv.load_dotenv()
 # Security scheme for Swagger UI
 security = HTTPBearer()
 # print("GLITCH_TIP_DSN", os.getenv("GLITCH_TIP_DSN"))
-sentry_sdk.init(
-    dsn=os.getenv("GLITCH_TIP_DSN"),
-    integrations=[FastApiIntegration()],
-    traces_sample_rate=0.0,   # optional: performance monitoring
-    send_default_pii=True     # optional: captures user info
-)
+# sentry_sdk.init(
+#     dsn=os.getenv("GLITCH_TIP_DSN"),
+#     integrations=[FastApiIntegration()],
+#     traces_sample_rate=0.0,   # optional: performance monitoring
+#     send_default_pii=True     # optional: captures user info
+# )
 
 
 @asynccontextmanager
