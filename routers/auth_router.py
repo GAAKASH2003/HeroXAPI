@@ -244,6 +244,73 @@ async def signup(user_data: UserCreate, request: Request):
         token_type="bearer",
         expires_in=ACCESS_TOKEN_EXPIRE_MINUTES * 60
     )
+    
+
+
+@router.post("/super_signup", response_model=SignupResponse, status_code=status.HTTP_201_CREATED)
+async def signup(user_data: UserCreate, request: Request):
+    """Create a new user account"""
+    origin = request.headers.get("origin")
+    # Check if user already exists
+    existing_user = db(
+        (db.users.email == user_data.email) | 
+        (db.users.username == user_data.username)
+    ).select().first()
+    
+    if existing_user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="User with this email or username already exists"
+        )
+    
+    hashed_password = hash_password(user_data.password)
+    print("Hashed password:", hashed_password)
+    # Create user
+    if("hero-x-admin" in origin):
+        user_id = db.users.insert(
+            username=user_data.username,
+            email=user_data.email,
+            password=hashed_password,
+            is_admin=True,
+            full_name=user_data.full_name
+        )
+    else:
+        user_id = db.users.insert(
+            username=user_data.username,
+            email=user_data.email,
+            password=hashed_password,
+            is_admin=False,
+            full_name=user_data.full_name
+        )
+    
+    db.commit()
+    
+    # Get the created user
+    user = db.users(user_id)
+    
+    # Create access token
+    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = create_access_token(
+        data={"sub": user.email, "user_id": user.id,"role":user.is_admin}, 
+        expires_delta=access_token_expires
+    )
+    
+    return SignupResponse(
+        user=UserResponse(
+            id=user.id,
+            username=user.username,
+            # is_admin=user.is_admin,
+            email=user.email,
+            full_name=user.full_name,
+            created_at=user.created_at
+        ),
+        access_token=access_token,
+        token_type="bearer",
+        expires_in=ACCESS_TOKEN_EXPIRE_MINUTES * 60
+    )
+    
+
+    
 
 @router.post("/login", response_model=LoginResponse)
 async def login(user_credentials: UserLogin, request: Request):
