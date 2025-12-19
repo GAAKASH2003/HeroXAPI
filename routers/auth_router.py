@@ -266,7 +266,7 @@ async def signup(user_data: UserCreate, request: Request):
     hashed_password = hash_password(user_data.password)
     print("Hashed password:", hashed_password)
     # Create user
-    print(origin)
+    print("origin:",origin)
     if("https://hero-x-admin.vercel.app" in origin):
         user_id = db.users.insert(
             username=user_data.username,
